@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>EncoreDB — Customer Analytics</title>
+  <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0a0a0f;
+      --surface: #13131a;
+      --surface2: #1c1c27;
+      --border: #2a2a3d;
+      --accent: #7c6af7;
+      --accent2: #f7a26a;
+      --accent3: #6af7c4;
+      --text: #eaeaf5;
+      --muted: #7070a0;
+      --danger: #f76a6a;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'DM Mono', monospace;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* Animated background grid */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(124,106,247,0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(124,106,247,0.04) 1px, transparent 1px);
+      background-size: 48px 48px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .wrapper {
+      position: relative;
+      z-index: 1;
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 40px 32px;
+    }
+
+    /* HEADER */
+    header {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      margin-bottom: 48px;
+      padding-bottom: 24px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .logo-block .eyebrow {
+      font-size: 10px;
+      letter-spacing: 0.25em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 6px;
+    }
+
+    .logo-block h1 {
+      font-family: 'Syne', sans-serif;
+      font-size: 32px;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      background: linear-gradient(135deg, var(--text) 40%, var(--accent) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .status-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--accent3);
+      box-shadow: 0 0 8px var(--accent3);
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(0.8); }
+    }
+
+    .status-text {
+      font-size: 11px;
+      color: var(--muted);
+      letter-spacing: 0.05em;
+    }
+
+    .refresh-btn {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-family: 'DM Mono', monospace;
+      font-size: 11px;
+      padding: 8px 16px;
+      border-radius: 6px;
+      cursor: pointer;
+      letter-spacing: 0.05em;
+      transition: all 0.2s;
+    }
+
+    .refresh-btn:hover {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
+
+    /* STATS CARDS */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      margin-bottom: 32px;
+    }
+
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px;
+      position: relative;
+      overflow: hidden;
+      transition: border-color 0.2s, transform 0.2s;
+    }
+
+    .stat-card:hover {
+      border-color: var(--accent);
+      transform: translateY(-2px);
+    }
+
+    .stat-card::after {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+
+    .stat-card:hover::after { opacity: 1; }
+
+    .stat-label {
+      font-size: 10px;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 12px;
+    }
+
+    .stat-value {
+      font-family: 'Syne', sans-serif;
+      font-size: 28px;
+      font-weight: 700;
+      color: var(--text);
+      letter-spacing: -0.03em;
+    }
+
+    .stat-value.green { color: var(--accent3); }
+    .stat-value.orange { color: var(--accent2); }
+    .stat-value.purple { color: var(--accent); }
+
+    /* MAIN GRID */
+    .main-grid {
+      display: grid;
+      grid-template-columns: 1fr 420px;
+      gap: 24px;
+      margin-bottom: 24px;
+    }
+
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    .panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 20px 24px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .panel-title {
+      font-family: 'Syne', sans-serif;
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+    }
+
+    .panel-badge {
+      font-size: 10px;
+      padding: 3px 10px;
+      border-radius: 20px;
+      background: rgba(124,106,247,0.15);
+      color: var(--accent);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+
+    .panel-body { padding: 20px 24px; }
+
+    /* CHART */
+    #bar-chart {
+      height: 340px;
+    }
+
+    /* PIE CHART */
+    #pie-chart {
+      height: 340px;
+    }
+
+    /* TABLE */
+    .table-panel { grid-column: 1 / -1; }
+
+    .table-scroll { overflow-x: auto; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+
+    thead tr {
+      border-bottom: 1px solid var(--border);
+    }
+
+    th {
+      padding: 12px 16px;
+      text-align: left;
+      font-size: 9px;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--muted);
+      font-weight: 500;
+    }
+
+    tbody tr {
+      border-bottom: 1px solid rgba(42,42,61,0.5);
+      transition: background 0.15s;
+    }
+
+    tbody tr:hover { background: var(--surface2); }
+
+    td {
+      padding: 14px 16px;
+      color: var(--text);
+      vertical-align: middle;
+    }
+
+    .rank-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 24px; height: 24px;
+      border-radius: 6px;
+      font-family: 'Syne', sans-serif;
+      font-weight: 700;
+      font-size: 11px;
+    }
+
+    .rank-1 { background: rgba(247,162,106,0.2); color: var(--accent2); }
+    .rank-2 { background: rgba(124,106,247,0.2); color: var(--accent); }
+    .rank-3 { background: rgba(106,247,196,0.2); color: var(--accent3); }
+    .rank-other { background: var(--surface2); color: var(--muted); }
+
+    .customer-name {
+      font-family: 'Syne', sans-serif;
+      font-weight: 600;
+      font-size: 13px;
+    }
+
+    .uid-tag {
+      display: inline-block;
+      background: rgba(124,106,247,0.1);
+      color: var(--accent);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 10px;
+      letter-spacing: 0.05em;
+    }
+
+    .price-cell {
+      font-family: 'Syne', sans-serif;
+      font-weight: 700;
+      font-size: 14px;
+      color: var(--accent3);
+    }
+
+    .bar-cell { min-width: 120px; }
+
+    .spend-bar-bg {
+      background: var(--surface2);
+      border-radius: 4px;
+      height: 6px;
+      overflow: hidden;
+    }
+
+    .spend-bar-fill {
+      height: 100%;
+      border-radius: 4px;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      transition: width 0.8s cubic-bezier(0.4,0,0.2,1);
+    }
+
+    /* EMAIL / PHONE */
+    .contact-small {
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    /* EXPORT BUTTON */
+    .export-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      font-family: 'DM Mono', monospace;
+      font-size: 11px;
+      padding: 6px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-decoration: none;
+    }
+
+    .export-btn:hover {
+      border-color: var(--accent3);
+      color: var(--accent3);
+    }
+
+    /* LOADING */
+    .loading {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 200px;
+      color: var(--muted);
+      font-size: 12px;
+      letter-spacing: 0.1em;
+      gap: 12px;
+    }
+
+    .spinner {
+      width: 16px; height: 16px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ERROR */
+    .error-msg {
+      color: var(--danger);
+      font-size: 12px;
+      padding: 20px;
+      text-align: center;
+    }
+
+    /* FOOTER */
+    footer {
+      margin-top: 40px;
+      padding-top: 24px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      color: var(--muted);
+      font-size: 10px;
+      letter-spacing: 0.1em;
+    }
+
+    @media (max-width: 900px) {
+      .stats-grid { grid-template-columns: repeat(2, 1fr); }
+      .main-grid { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 500px) {
+      .stats-grid { grid-template-columns: 1fr 1fr; }
+      .wrapper { padding: 20px 16px; }
+    }
+  </style>
+</head>
+<body>
+<div class="wrapper">
+
+  <!-- HEADER -->
+  <header>
+    <div class="logo-block">
+      <div class="eyebrow">Customer Intelligence</div>
+      <h1>EncoreDB Analytics</h1>
+    </div>
+    <div class="header-right">
+      <div class="status-dot"></div>
+      <span class="status-text">LIVE · MONGODB</span>
+      <button class="refresh-btn" onclick="loadAll()">↻ Refresh</button>
+      <button class="export-btn" onclick="exportCSV()">↓ Export CSV</button>
+    </div>
+  </header>
+
+  <!-- STAT CARDS -->
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-label">Total Revenue</div>
+      <div class="stat-value green" id="stat-revenue">—</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Total Orders</div>
+      <div class="stat-value purple" id="stat-orders">—</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Unique Customers</div>
+      <div class="stat-value orange" id="stat-customers">—</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Avg Order Value</div>
+      <div class="stat-value" id="stat-avg">—</div>
+    </div>
+  </div>
+
+  <!-- CHARTS -->
+  <div class="main-grid">
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">Top 10 Customers — Total Spend</span>
+        <span class="panel-badge">Bar Chart</span>
+      </div>
+      <div class="panel-body">
+        <div id="bar-chart"><div class="loading"><div class="spinner"></div> Loading chart...</div></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">Spend Distribution</span>
+        <span class="panel-badge">Pie Chart</span>
+      </div>
+      <div class="panel-body">
+        <div id="pie-chart"><div class="loading"><div class="spinner"></div> Loading chart...</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TABLE -->
+  <div class="panel table-panel">
+    <div class="panel-header">
+      <span class="panel-title">Customer Leaderboard</span>
+      <span class="panel-badge">Top 10</span>
+    </div>
+    <div class="table-scroll">
+      <div id="table-container">
+        <div class="loading"><div class="spinner"></div> Loading data...</div>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <span>EncoreDB · ordermasters collection</span>
+    <span id="last-updated">—</span>
+  </footer>
+</div>
+
+<script>
+  const API = 'http://localhost:5000';
+  let customersData = [];
+
+  async function loadAll() {
+    await Promise.all([loadSummary(), loadChartData(), loadCustomers()]);
+    document.getElementById('last-updated').textContent =
+      'Updated · ' + new Date().toLocaleTimeString();
+  }
+
+  async function loadSummary() {
+    try {
+      const res = await fetch(`${API}/api/summary`);
+      const d = await res.json();
+      document.getElementById('stat-revenue').textContent = '₹' + d.total_revenue.toLocaleString();
+      document.getElementById('stat-orders').textContent = d.total_orders.toLocaleString();
+      document.getElementById('stat-customers').textContent = d.unique_customers.toLocaleString();
+      document.getElementById('stat-avg').textContent = '₹' + d.avg_order_value.toLocaleString();
+    } catch(e) {
+      console.error('Summary error:', e);
+    }
+  }
+
+  async function loadChartData() {
+    try {
+      const res = await fetch(`${API}/api/chart-data`);
+      const d = await res.json();
+
+      // BAR CHART
+      Plotly.newPlot('bar-chart', [{
+        type: 'bar',
+        x: d.labels,
+        y: d.values,
+        text: d.values.map(v => '₹' + v.toLocaleString()),
+        textposition: 'outside',
+        marker: {
+          color: d.values,
+          colorscale: [[0,'#4a3fcc'],[0.5,'#7c6af7'],[1,'#f7a26a']],
+          line: { width: 0 }
+        },
+        hovertemplate: '<b>%{x}</b><br>₹%{y:,.2f}<extra></extra>'
+      }], {
+        paper_bgcolor: 'transparent',
+        plot_bgcolor: 'transparent',
+        font: { family: 'DM Mono, monospace', color: '#7070a0', size: 11 },
+        margin: { t: 20, r: 10, b: 80, l: 60 },
+        xaxis: {
+          tickangle: -35,
+          gridcolor: 'rgba(42,42,61,0.5)',
+          tickfont: { size: 10 }
+        },
+        yaxis: {
+          gridcolor: 'rgba(42,42,61,0.5)',
+          tickprefix: '₹',
+          tickformat: ',.0f'
+        },
+        bargap: 0.3
+      }, { responsive: true, displayModeBar: false });
+
+      // PIE CHART
+      Plotly.newPlot('pie-chart', [{
+        type: 'pie',
+        labels: d.labels,
+        values: d.values,
+        hole: 0.45,
+        textinfo: 'percent',
+        hovertemplate: '<b>%{label}</b><br>₹%{value:,.2f}<br>%{percent}<extra></extra>',
+        marker: {
+          colors: ['#7c6af7','#f7a26a','#6af7c4','#f76a9e','#6ab3f7',
+                   '#c46af7','#f7e06a','#6af7a2','#f7a26a','#a26af7'],
+          line: { color: '#13131a', width: 2 }
+        }
+      }], {
+        paper_bgcolor: 'transparent',
+        plot_bgcolor: 'transparent',
+        font: { family: 'DM Mono, monospace', color: '#7070a0', size: 11 },
+        margin: { t: 10, r: 10, b: 10, l: 10 },
+        legend: { font: { size: 10 }, bgcolor: 'transparent' },
+        showlegend: true
+      }, { responsive: true, displayModeBar: false });
+
+    } catch(e) {
+      document.getElementById('bar-chart').innerHTML = '<div class="error-msg">⚠ Could not load chart. Is Flask running?</div>';
+      document.getElementById('pie-chart').innerHTML = '<div class="error-msg">⚠ Could not load chart.</div>';
+    }
+  }
+
+  async function loadCustomers() {
+    try {
+      const res = await fetch(`${API}/api/top-customers`);
+      customersData = await res.json();
+      const maxSpend = Math.max(...customersData.map(c => c.order_Overall_Price));
+
+      const rows = customersData.map((c, i) => {
+        const rankClass = i === 0 ? 'rank-1' : i === 1 ? 'rank-2' : i === 2 ? 'rank-3' : 'rank-other';
+        const pct = ((c.order_Overall_Price / maxSpend) * 100).toFixed(1);
+        return `
+          <tr>
+            <td><span class="rank-badge ${rankClass}">${i+1}</span></td>
+            <td><div class="customer-name">${c.order_customer_name}</div></td>
+            <td><span class="uid-tag">${c.order_customer_UID}</span></td>
+            <td><div class="contact-small">${c.order_customer_contact_email || '—'}</div></td>
+            <td><div class="contact-small">${c.order_customer_contact_phone || '—'}</div></td>
+            <td><div class="price-cell">₹${c.order_Overall_Price.toLocaleString()}</div></td>
+            <td class="bar-cell">
+              <div class="spend-bar-bg">
+                <div class="spend-bar-fill" style="width:${pct}%"></div>
+              </div>
+            </td>
+          </tr>`;
+      }).join('');
+
+      document.getElementById('table-container').innerHTML = `
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Customer Name</th>
+              <th>UID</th>
+              <th>Email</th>
+              <th>Phone</th>
+              <th>Total Spend</th>
+              <th>Share</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>`;
+    } catch(e) {
+      document.getElementById('table-container').innerHTML =
+        '<div class="error-msg">⚠ Cannot connect to Flask API at localhost:5000. Make sure app.py is running.</div>';
+    }
+  }
+
+  function exportCSV() {
+    if (!customersData.length) { alert('No data to export yet.'); return; }
+    const headers = ['Rank','Customer Name','UID','Email','Phone','Total Spend'];
+    const rows = customersData.map((c, i) => [
+      i+1, c.order_customer_name, c.order_customer_UID,
+      c.order_customer_contact_email, c.order_customer_contact_phone,
+      c.order_Overall_Price
+    ]);
+    const csv = [headers, ...rows].map(r => r.join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'top_customers_encoredb.csv';
+    a.click();
+  }
+
+  loadAll();
+</script>
+</body>
+</html>
